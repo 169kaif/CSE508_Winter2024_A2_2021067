@@ -158,7 +158,7 @@ while True:
     for i in range(num_unique_words):
         tf_review_sum += tf_review[i]
 
-    tf_review /= tf_review_sum
+    tf_review /= (tf_review_sum + 1e-5)
 
     #multiply with idf
     for i in range(num_unique_words):
@@ -226,8 +226,6 @@ while True:
         tr_image_link = num_image_review_dict[idx_to_doc[text_scores_idxs[i]]][1][0]
         print("Image Link: ", tr_image_link)
         for j in range(len(all_image_features)):
-            if (i == 0):
-                continue
             if all_image_features[j][2] == tr_image_link:
                 image_cosine_sim = cosim.sim(normalized_features_np, all_image_features[j][3])
                 print("Image Cosine Similarity: ", image_cosine_sim)
