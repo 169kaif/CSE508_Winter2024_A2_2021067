@@ -61,7 +61,10 @@ class Cosim():
 
         dot_product = self.dot_prod(v1, v2)
 
-        return dot_product / (nv1*nv2)
+        if ((nv1 == 0) or (nv2 == 0)):
+            return 0
+
+        return float(dot_product) / (nv1*nv2)
 
 if (__name__ == '__main__'):
 
@@ -71,6 +74,10 @@ if (__name__ == '__main__'):
     # make sure the np array has dtype float64
     v1 = np.array([[1,2,3,4], [1,2,3,4]], dtype = 'float64')
     v2 = np.array([[1,2,3,4], [1,2,3,4]], dtype = 'float64')
+    print(cosim.sim(v1, v2))
+
+    v1 = np.array([[1,2,3,4], [5,6,7,8], [1,2,3,4], [5,6,7,8], [1,2,3,4], [1,2,3,4]], dtype = 'float64')
+    v2 = np.array([[1,2,3,4], [5,6,7,8], [1,2,3,4], [5,6,7,8], [1,2,3,4], [1,2,3,4]], dtype = 'float64')
     print(cosim.sim(v1, v2))
 
     v3 = np.array([1,2,3,4], dtype = 'float64')
