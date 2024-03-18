@@ -86,10 +86,6 @@ with open('tfidf_mat.pkl', 'rb') as f:
     tfidf_mat = pickle.load(f)
 
 # import extracted image features and labels
-with open('extracted_fts_labels.pkl', 'rb') as f:
-    extracted_fts_labels = pickle.load(f)
-
-# import alt extracted image features and labels
 with open('image_features.pkl', 'rb') as f:
     all_image_features = pickle.load(f)
 
@@ -207,78 +203,84 @@ while True:
     normalized_features_np = input_image_features.numpy()
     normalized_features_np = (normalized_features_np-np.mean(normalized_features_np))/ (np.std(normalized_features_np)+(1e-5))
 
-    # input image features are now stored in input_image_features
+    # init list to store composite scores w/ ele = [composite_score, product_id, image_link]
+    composite_scores = []
 
-    """ 
-    Now, we calculate cosine similarities
-    b/w review text tfidf and all other docs tfidf
-    """
-
-    cosine_text_scores = []
+    # text based similarity
+    text_sim_scores = []
     for i in range(num_docs):
-        csts = cosim.sim(tf_review, tfidf_mat[:,i])
-        cosine_text_scores.append(csts)
+        text_sim_scores.append(cosim.sim(tf_review, tfidf_mat[:,i]))
 
-    # Rank these indices according to higher scores
-    sorted_text_indices = np.argsort(cosine_text_scores)[::-1]
+    # rank the text similarity scores
+    text_sim_scores = np.array(text_sim_scores)
+    text_scores_idxs = np.argsort(text_sim_scores)[::-1]
 
-    # cosine_image_scores = []
-    # for image_features in extracted_fts_labels:
-    #     csts = cosim.sim(normalized_features_np.flatten(), image_features[0].flatten())
-    #     cosine_image_scores.append(csts)
-
-    # # Rank these indices according to higher scores
-    # sorted_image_indices = np.argsort(cosine_image_scores)[::-1]
-
-    # composite scores
-    # composite_scores = []
-    # for image_features in extracted_fts_labels:
-    #     doc_id = int(image_features[1].split('_')[0])
-    #     doc_id_idx = doc_to_idx[doc_id]
-    #     csts = (cosim.sim(normalized_features_np.flatten(), image_features[0].flatten()) + cosim.sim(tf_review, tfidf_mat[:, doc_id_idx])) / 2.0
-    #     composite_scores.append(csts)
-
-    # # Rank these indices according to higher scores
-    # sorted_composite_indices = np.argsort(composite_scores)[::-1]
-
-    # Print the results obtained using text retrieval
-    print("Results obtained using text retrieval: ")
-    for i in range(3):
-        print("The cosine similarity score b/w input review and doc ", idx_to_doc[sorted_text_indices[i]], " is ", cosine_text_scores[sorted_text_indices[i]])
-        print("The review text is: ", num_image_review_dict[idx_to_doc[sorted_text_indices[i]]][0])
+    print("Top 5 documents retrieved based on text similarity: ")
+    for i in range(5):
+        print("Rank: ", i+1)
+        print("Product ID: ", idx_to_doc[text_scores_idxs[i]])
+        print("Text Cosine Similarity: ", text_sim_scores[text_scores_idxs[i]])
+        print("Review Text: ", num_image_review_dict[idx_to_doc[text_scores_idxs[i]]][0])    
         print("\n\n")
 
-    # # Print the results obtained using image retrieval
-    # print("Results obtained using image retrieval: ")
-    # for i in range(3):
-    #     print("The cosine similarity score b/w input image and image", extracted_fts_labels[sorted_image_indices[i]][1], " is ", cosine_image_scores[sorted_image_indices[i]])
+        tr_image_link = num_image_review_dict[idx_to_doc[text_scores_idxs[i]]][1][0]
+        print("Image Link: ", tr_image_link)
+        for j in range(len(all_image_features)):
+            if (i == 0):
+                continue
+            if all_image_features[j][2] == tr_image_link:
+                image_cosine_sim = cosim.sim(normalized_features_np, all_image_features[j][3])
+                print("Image Cosine Similarity: ", image_cosine_sim)
+                comp_ret_score = ( (text_sim_scores[text_scores_idxs[i]]) + (image_cosine_sim) ) / 2
+                composite_scores.append([comp_ret_score, idx_to_doc[text_scores_idxs[i]], tr_image_link])
+                break
+        print("\n\n")
 
-    #     doc_index = int(extracted_fts_labels[sorted_image_indices[i]][1].split('_')[0])
-    #     url_index = int(extracted_fts_labels[sorted_image_indices[i]][1].split('_')[1]) - 1
-
-    #     print("The image url is: ", num_image_review_dict[doc_index][1][url_index])
-    #     print("\n\n")
-
-    # # Print the results obtained using composite retrieval
-    # print("Results obtained using combined retrieval: ")
-    # for i in range(3):
-    #     print("The composite similarity score is: " , composite_scores[sorted_composite_indices[i]])
-
-    #     doc_index = int(extracted_fts_labels[sorted_composite_indices[i]][1].split('_')[0])
-    #     url_index = int(extracted_fts_labels[sorted_composite_indices[i]][1].split('_')[1]) - 1
-
-    #     print("the doc index is: ", doc_index)
-
-    #     print("The image url is: ", num_image_review_dict[doc_index][1][url_index])
-    #     print("The review text is: ", num_image_review_dict[doc_index][0])
-    #     print("\n\n")
-
+    # image based similarity
+    image_sim_scores = []
     for i in range(len(all_image_features)):
-        prod_id = all_image_features[i][1]
-        if (prod_id == str(2188)):
-            print(all_image_features[i][2])
-            print(all_image_features[i][3])
-            print(normalized_features_np)
-            print(normalized_features_np.shape)
-            print(normalized_features_np.flatten().shape)
-            print(cosim.sim(normalized_features_np.flatten(), all_image_features[i][3].flatten()))
+        image_sim_scores.append(cosim.sim(normalized_features_np, all_image_features[i][3]))
+
+    # rank the image similarity scores
+    image_sim_scores = np.array(image_sim_scores)
+    image_scores_idxs = np.argsort(image_sim_scores)[::-1]
+
+    docs_found = set()
+
+    print("Top 5 documents retrieved based on image similarity: ")
+    docs_retrieved = 0
+    curr_idx = 0
+
+    while docs_retrieved < 5:
+
+        product_id = int(all_image_features[image_scores_idxs[curr_idx]][1])
+
+        if product_id in docs_found:
+            curr_idx += 1
+            continue
+        else:
+            docs_found.add(product_id)
+            docs_retrieved += 1
+
+        print("Rank: ", docs_retrieved)
+        print("Product ID: ", product_id)
+        print("Image Link: ", all_image_features[image_scores_idxs[curr_idx]][2])
+        print("Image Cosine Similarity: ", image_sim_scores[image_scores_idxs[curr_idx]])
+        print("\n\n")
+
+        print("Review Text: ", num_image_review_dict[product_id][0])
+        print("Text Cosine Similarity: ", text_sim_scores[doc_to_idx[product_id]])
+        print("\n\n")
+
+        comp_ret_score = ( (text_sim_scores[doc_to_idx[product_id]]) + (image_sim_scores[image_scores_idxs[curr_idx]]) ) / 2
+        composite_scores.append([comp_ret_score, product_id, all_image_features[image_scores_idxs[curr_idx]][2]])
+
+    print("Top documents retrieved based on composite similarity: ")
+    composite_scores = sorted(composite_scores, key=lambda x: x[0], reverse=True)
+    for i in range(len(composite_scores)):
+        print("Rank: ", i+1)
+        print("Product ID: ", composite_scores[i][1])
+        print("Review Text: ", num_image_review_dict[composite_scores[i][1]][0])
+        print("Image Link: ", composite_scores[i][2])
+        print("Composite Similarity: ", composite_scores[i][0])
+        print("\n\n")
